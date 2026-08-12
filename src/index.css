@@ -1,0 +1,91 @@
+:root {
+  --color-bg: #0f1115;
+  --color-surface: #1a1d24;
+  --color-text: #f0f1f3;
+  --color-text-muted: #9aa0ab;
+  --color-accent: #5b8def;
+  --color-border: #2a2e37;
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 1rem;
+  --space-4: 1.5rem;
+  --radius: 0.5rem;
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  line-height: 1.4;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+.page {
+  max-width: 480px;
+  margin: 0 auto;
+  padding: var(--space-4) var(--space-3);
+}
+
+h1 {
+  font-size: 1.5rem;
+  margin: 0 0 var(--space-1);
+}
+
+.subtitle {
+  color: var(--color-text-muted);
+  margin: 0 0 var(--space-4);
+}
+
+.username-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: var(--space-3);
+}
+
+.username-form label {
+  font-size: 0.875rem;
+  color: var(--color-text-muted);
+}
+
+.username-form input {
+  font-size: 1rem;
+  padding: var(--space-2);
+  border-radius: var(--radius);
+  border: 1px solid var(--color-border);
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+
+.username-form button {
+  font-size: 1rem;
+  padding: var(--space-2);
+  border-radius: var(--radius);
+  border: none;
+  background: var(--color-accent);
+  color: #fff;
+  cursor: pointer;
+}
+
+.username-form button:disabled,
+.username-form input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
