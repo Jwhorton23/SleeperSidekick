@@ -62,11 +62,13 @@ export function LeaguePicker() {
       {state.status === "ready" && state.leagues.length > 0 && (
         <ul className="league-list">
           {state.leagues.map((league) => (
-            <li key={league.leagueId} className="league-card">
-              <span className="league-name">{league.name}</span>
-              <span className="league-meta">
-                {league.totalRosters} teams &middot; {league.season}
-              </span>
+            <li key={league.leagueId}>
+              <Link to={`/league/${league.leagueId}`} className="league-card league-card-link">
+                <span className="league-name">{league.name}</span>
+                <span className="league-meta">
+                  {league.totalRosters} teams &middot; {league.season}
+                </span>
+              </Link>
             </li>
           ))}
         </ul>
