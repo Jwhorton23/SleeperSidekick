@@ -16,6 +16,22 @@ export interface RawSleeperLeague {
   avatar: string | null;
   previous_league_id: string | null;
   status: string;
+  roster_positions?: string[];
+  settings?: {
+    playoff_week_start?: number;
+  };
+}
+
+export interface RawSleeperLeagueUser {
+  user_id: string;
+  display_name: string;
+  avatar: string | null;
+  metadata?: { team_name?: string } | null;
+}
+
+export interface RawSleeperRoster {
+  roster_id: number;
+  owner_id: string | null;
 }
 
 export interface RawNflState {
