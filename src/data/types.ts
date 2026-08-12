@@ -38,6 +38,7 @@ export interface LeagueData {
 
 export interface Season {
   leagueId: string;
+  name: string; // league display name, e.g. "Moonshooters"
   season: string;
   starterSlots: Slot[]; // roster_positions minus BN/IR/TAXI, order preserved
   playoffWeekStart: number;
