@@ -10,6 +10,7 @@ import type { LuckIndexEntry } from "../../stats/luckIndex";
 import { powerRankings } from "../../stats/powerRankings";
 import { scheduleSwapMatrix } from "../../stats/scheduleSwap";
 import { weeklyHighlights } from "../../stats/weeklyHighlights";
+import type { PlayoffOddsWorkerRequest, PlayoffOddsWorkerResponse } from "../../workers/playoffOdds.worker";
 
 type LoadState =
   | { status: "loading" }
@@ -92,6 +93,7 @@ export function Dashboard() {
         <p className="subtitle">No completed weeks yet this season — stats will show up once games have been played.</p>
       ) : (
         <>
+          <PlayoffOddsCard season={season} teamName={teamName} />
           <PowerRankingsCard season={season} teamName={teamName} />
           <LuckCard season={season} luck={luck} teamName={teamName} />
           <ScheduleSwapCard season={season} teamName={teamName} />
@@ -100,6 +102,45 @@ export function Dashboard() {
         </>
       )}
     </main>
+  );
+}
+
+function PlayoffOddsCard({ season, teamName }: { season: Season; teamName: (id: RosterId) => string }) {
+  const [results, setResults] = useState<PlayoffOddsWorkerResponse | null>(null);
+
+  useEffect(() => {
+    setResults(null);
+    if (season.remainingWeeks.length === 0) return;
+
+    // Monte Carlo runs on a Web Worker (PLAN.md) — 10,000 simulations
+    // would otherwise stall scrolling on a mid-tier phone.
+    const worker = new Worker(new URL("../../workers/playoffOdds.worker.ts", import.meta.url), { type: "module" });
+    worker.onmessage = (event: MessageEvent<PlayoffOddsWorkerResponse>) => setResults(event.data);
+    const request: PlayoffOddsWorkerRequest = { season };
+    worker.postMessage(request);
+
+    return () => worker.terminate();
+  }, [season]);
+
+  if (season.remainingWeeks.length === 0) return null;
+
+  return (
+    <section className="stat-card">
+      <h2>Playoff Odds</h2>
+      <p className="stat-card-subtitle">10,000-season Monte Carlo simulation over the remaining schedule.</p>
+      {!results ? (
+        <p className="stat-card-subtitle">Simulating&hellip;</p>
+      ) : (
+        <ul className="stat-list">
+          {results.map((entry) => (
+            <li key={entry.rosterId} className="stat-row">
+              <span className="stat-row-name">{teamName(entry.rosterId)}</span>
+              <span className="stat-row-value">{entry.playoffPct.toFixed(1)}%</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
   );
 }
 
