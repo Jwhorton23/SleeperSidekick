@@ -5,7 +5,19 @@ import type {
   RawSleeperRoster,
   RawSleeperUser,
 } from "../api/types";
-import type { Game, LeagueSummary, Manager, RosterId, Season, SleeperUser, Team, TeamWeek, UserId, Week } from "./types";
+import type {
+  Game,
+  LeagueSummary,
+  Manager,
+  RemainingWeek,
+  RosterId,
+  Season,
+  SleeperUser,
+  Team,
+  TeamWeek,
+  UserId,
+  Week,
+} from "./types";
 
 export function toSleeperUser(raw: RawSleeperUser): SleeperUser {
   return {
@@ -60,15 +72,22 @@ export function buildTeams(rosters: RawSleeperRoster[], users: RawSleeperLeagueU
 
 const NON_STARTER_SLOTS = new Set(["BN", "IR", "TAXI"]);
 
-export function toSeason(league: RawSleeperLeague, teams: Map<RosterId, Team>, weeks: Week[] = []): Season {
+export function toSeason(
+  league: RawSleeperLeague,
+  teams: Map<RosterId, Team>,
+  weeks: Week[] = [],
+  remainingWeeks: RemainingWeek[] = [],
+): Season {
   return {
     leagueId: league.league_id,
     name: league.name,
     season: league.season,
     starterSlots: (league.roster_positions ?? []).filter((slot) => !NON_STARTER_SLOTS.has(slot)),
     playoffWeekStart: league.settings?.playoff_week_start ?? 15,
+    playoffTeams: league.settings?.playoff_teams ?? 4,
     teams,
     weeks,
+    remainingWeeks,
   };
 }
 
@@ -102,4 +121,24 @@ export function toWeek(week: number, entries: RawSleeperMatchupEntry[]): Week {
   }
 
   return { week, games };
+}
+
+/** Same grouping as toWeek, but for a not-yet-played week: only the
+ * matchup pairing matters, since there are no scores yet. */
+export function toRemainingWeek(week: number, entries: RawSleeperMatchupEntry[]): RemainingWeek {
+  const byMatchupId = new Map<number, RawSleeperMatchupEntry[]>();
+  for (const entry of entries) {
+    if (entry.matchup_id == null) continue;
+    const group = byMatchupId.get(entry.matchup_id) ?? [];
+    group.push(entry);
+    byMatchupId.set(entry.matchup_id, group);
+  }
+
+  const matchups: RemainingWeek["matchups"] = [];
+  for (const group of byMatchupId.values()) {
+    if (group.length !== 2) continue;
+    matchups.push({ rosterIdA: group[0].roster_id, rosterIdB: group[1].roster_id });
+  }
+
+  return { week, matchups };
 }

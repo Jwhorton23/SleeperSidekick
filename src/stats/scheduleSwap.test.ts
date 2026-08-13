@@ -14,12 +14,14 @@ describe("scheduleSwapMatrix", () => {
       season: "2025",
       starterSlots: [],
       playoffWeekStart: 15,
+      playoffTeams: 4,
       teams: new Map([
         [1, { rosterId: 1, ownerId: "u1", name: "Team 1" }],
         [2, { rosterId: 2, ownerId: "u2", name: "Team 2" }],
         [3, { rosterId: 3, ownerId: "u3", name: "Team 3" }],
         [4, { rosterId: 4, ownerId: "u4", name: "Team 4" }],
       ]),
+      remainingWeeks: [],
       weeks: [
         {
           week: 1,
