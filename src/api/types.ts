@@ -19,6 +19,7 @@ export interface RawSleeperLeague {
   roster_positions?: string[];
   settings?: {
     playoff_week_start?: number;
+    last_scored_leg?: number;
   };
 }
 
@@ -32,6 +33,15 @@ export interface RawSleeperLeagueUser {
 export interface RawSleeperRoster {
   roster_id: number;
   owner_id: string | null;
+}
+
+export interface RawSleeperMatchupEntry {
+  roster_id: number;
+  matchup_id: number | null;
+  points: number;
+  starters: string[]; // player IDs in slot order matching roster_positions; "0" = empty slot
+  players: string[]; // every rostered player that week (starters + bench)
+  players_points: Record<string, number>;
 }
 
 export interface RawNflState {

@@ -1,5 +1,11 @@
-import type { RawSleeperLeague, RawSleeperLeagueUser, RawSleeperRoster, RawSleeperUser } from "../api/types";
-import type { LeagueSummary, Manager, RosterId, Season, SleeperUser, Team, UserId } from "./types";
+import type {
+  RawSleeperLeague,
+  RawSleeperLeagueUser,
+  RawSleeperMatchupEntry,
+  RawSleeperRoster,
+  RawSleeperUser,
+} from "../api/types";
+import type { Game, LeagueSummary, Manager, RosterId, Season, SleeperUser, Team, TeamWeek, UserId, Week } from "./types";
 
 export function toSleeperUser(raw: RawSleeperUser): SleeperUser {
   return {
@@ -54,7 +60,7 @@ export function buildTeams(rosters: RawSleeperRoster[], users: RawSleeperLeagueU
 
 const NON_STARTER_SLOTS = new Set(["BN", "IR", "TAXI"]);
 
-export function toSeason(league: RawSleeperLeague, teams: Map<RosterId, Team>): Season {
+export function toSeason(league: RawSleeperLeague, teams: Map<RosterId, Team>, weeks: Week[] = []): Season {
   return {
     leagueId: league.league_id,
     name: league.name,
@@ -62,6 +68,38 @@ export function toSeason(league: RawSleeperLeague, teams: Map<RosterId, Team>): 
     starterSlots: (league.roster_positions ?? []).filter((slot) => !NON_STARTER_SLOTS.has(slot)),
     playoffWeekStart: league.settings?.playoff_week_start ?? 15,
     teams,
-    weeks: [],
+    weeks,
   };
+}
+
+function toTeamWeek(entry: RawSleeperMatchupEntry): TeamWeek {
+  const starterIds = new Set(entry.starters.filter((id) => id !== "0"));
+  const pointsFor = (playerId: string) => entry.players_points[playerId] ?? 0;
+  return {
+    rosterId: entry.roster_id,
+    points: entry.points,
+    starters: entry.starters.map((playerId) => ({ playerId, points: playerId === "0" ? 0 : pointsFor(playerId) })),
+    bench: entry.players.filter((id) => !starterIds.has(id)).map((playerId) => ({ playerId, points: pointsFor(playerId) })),
+  };
+}
+
+/** Groups matchup entries by matchup_id into head-to-head Games. Entries
+ * that don't pair up 1:1 (a bye, a data glitch) are dropped — there's no
+ * opponent to compare against, so they can't contribute to any MVP stat. */
+export function toWeek(week: number, entries: RawSleeperMatchupEntry[]): Week {
+  const byMatchupId = new Map<number, RawSleeperMatchupEntry[]>();
+  for (const entry of entries) {
+    if (entry.matchup_id == null) continue;
+    const group = byMatchupId.get(entry.matchup_id) ?? [];
+    group.push(entry);
+    byMatchupId.set(entry.matchup_id, group);
+  }
+
+  const games: Game[] = [];
+  for (const group of byMatchupId.values()) {
+    if (group.length !== 2) continue;
+    games.push({ a: toTeamWeek(group[0]), b: toTeamWeek(group[1]) });
+  }
+
+  return { week, games };
 }
