@@ -20,6 +20,7 @@ export interface RawSleeperLeague {
   settings?: {
     playoff_week_start?: number;
     last_scored_leg?: number;
+    playoff_teams?: number;
   };
 }
 

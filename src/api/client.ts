@@ -7,8 +7,16 @@ import type {
   RawSleeperRoster,
   RawSleeperUser,
 } from "./types";
-import { buildManagers, buildTeams, toLeagueSummary, toSeason, toSleeperUser, toWeek } from "../data/normalize";
-import type { LeagueData, LeagueSummary, SleeperUser, Week } from "../data/types";
+import {
+  buildManagers,
+  buildTeams,
+  toLeagueSummary,
+  toRemainingWeek,
+  toSeason,
+  toSleeperUser,
+  toWeek,
+} from "../data/normalize";
+import type { LeagueData, LeagueSummary, RemainingWeek, SleeperUser, Week } from "../data/types";
 
 const BASE_URL = "https://api.sleeper.app/v1";
 
@@ -85,9 +93,8 @@ function regularSeasonWeeksPlayed(league: RawSleeperLeague): number[] {
   return Array.from({ length: lastRegularWeek }, (_, i) => i + 1);
 }
 
-async function getLeagueMatchups(leagueId: string, week: number, isLatestScoredWeek: boolean): Promise<RawSleeperMatchupEntry[]> {
+async function getLeagueMatchups(leagueId: string, week: number, ttl: number): Promise<RawSleeperMatchupEntry[]> {
   const key = `sleeper:${leagueId}:matchups:${week}`;
-  const ttl = isLatestScoredWeek ? TTL.SEMI_STABLE : TTL.IMMUTABLE;
   return cached<RawSleeperMatchupEntry[]>(key, ttl, () =>
     fetchJson<RawSleeperMatchupEntry[]>(`/league/${leagueId}/matchups/${week}`),
   );
@@ -97,20 +104,42 @@ async function loadWeeks(league: RawSleeperLeague): Promise<Week[]> {
   const weekNumbers = regularSeasonWeeksPlayed(league);
   const lastWeek = weekNumbers.at(-1);
   const entriesByWeek = await Promise.all(
-    weekNumbers.map((week) => getLeagueMatchups(league.league_id, week, week === lastWeek)),
+    weekNumbers.map((week) =>
+      getLeagueMatchups(league.league_id, week, week === lastWeek ? TTL.SEMI_STABLE : TTL.IMMUTABLE),
+    ),
   );
   return weekNumbers.map((week, i) => toWeek(week, entriesByWeek[i]));
 }
 
+/** Regular-season weeks with a schedule but no score yet — the games left
+ * to simulate for playoff odds. Sleeper generates the full-season matchup
+ * pairing in advance, so these are fetchable (with points=0) before they're
+ * played. */
+function regularSeasonWeeksRemaining(league: RawSleeperLeague): number[] {
+  const playoffStart = league.settings?.playoff_week_start ?? 15;
+  const lastScored = league.settings?.last_scored_leg ?? playoffStart - 1;
+  const firstRemaining = Math.max(1, lastScored + 1);
+  const lastRegularWeek = playoffStart - 1;
+  if (firstRemaining > lastRegularWeek) return [];
+  return Array.from({ length: lastRegularWeek - firstRemaining + 1 }, (_, i) => firstRemaining + i);
+}
+
+async function loadRemainingWeeks(league: RawSleeperLeague): Promise<RemainingWeek[]> {
+  const weekNumbers = regularSeasonWeeksRemaining(league);
+  const entriesByWeek = await Promise.all(weekNumbers.map((week) => getLeagueMatchups(league.league_id, week, TTL.MUTABLE)));
+  return weekNumbers.map((week, i) => toRemainingWeek(week, entriesByWeek[i]));
+}
+
 export async function loadLeagueData(leagueId: string): Promise<LeagueData> {
   const activeLeague = await resolveActiveSeasonLeague(leagueId);
-  const [rawUsers, rawRosters, weeks] = await Promise.all([
+  const [rawUsers, rawRosters, weeks, remainingWeeks] = await Promise.all([
     getLeagueUsers(activeLeague.league_id),
     getLeagueRosters(activeLeague.league_id),
     loadWeeks(activeLeague),
+    loadRemainingWeeks(activeLeague),
   ]);
   const managers = buildManagers(rawUsers);
   const teams = buildTeams(rawRosters, rawUsers);
-  const season = toSeason(activeLeague, teams, weeks);
+  const season = toSeason(activeLeague, teams, weeks, remainingWeeks);
   return { managers, seasons: [season] };
 }
