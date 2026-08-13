@@ -121,6 +121,15 @@ h1 {
   padding: var(--space-3);
 }
 
+.league-card-link {
+  text-decoration: none;
+  color: inherit;
+}
+
+.league-card-link:active {
+  border-color: var(--color-accent);
+}
+
 .league-name {
   font-weight: 600;
 }
