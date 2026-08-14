@@ -76,6 +76,9 @@ export function Dashboard() {
       <p className="subtitle">
         {season.season} season &middot; {teams.length} teams
       </p>
+      <Link to={`/league/${leagueId}/history`} className="record-book-link">
+        View multi-season record book &rarr;
+      </Link>
 
       <ul className="league-list">
         {teams.map((team) => {
