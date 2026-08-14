@@ -42,8 +42,19 @@ export interface Season {
   season: string;
   starterSlots: Slot[]; // roster_positions minus BN/IR/TAXI, order preserved
   playoffWeekStart: number;
+  playoffTeams: number; // how many teams make the playoff bracket
   teams: Map<RosterId, Team>;
-  weeks: Week[]; // completed weeks only, ascending
+  weeks: Week[]; // completed regular-season weeks, ascending
+  remainingWeeks: RemainingWeek[]; // scheduled-but-unplayed regular-season weeks, ascending
+  playoffWeeks: Week[]; // completed playoff-bracket weeks, ascending — only populated by the multi-season history loader (M6), empty otherwise
+  championRosterId: RosterId | null; // winner of the championship game (winners_bracket placement 1); null unless loaded via history
+}
+
+/** A future week's matchup pairings — the schedule is known in advance,
+ * scores aren't. Used for Monte Carlo playoff-odds simulation. */
+export interface RemainingWeek {
+  week: number;
+  matchups: { rosterIdA: RosterId; rosterIdB: RosterId }[];
 }
 
 export interface Team {
