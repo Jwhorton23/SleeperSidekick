@@ -7,7 +7,7 @@ let cached: Promise<Map<string, PlayerMeta>> | null = null;
  * not a Sleeper API call, so it doesn't go through src/api/cache.ts). */
 export function loadPlayerIndex(): Promise<Map<string, PlayerMeta>> {
   if (!cached) {
-    cached = fetch("/players.json")
+    cached = fetch(`${import.meta.env.BASE_URL}players.json`)
       .then((res) => {
         if (!res.ok) throw new Error(`Failed to load players.json (${res.status})`);
         return res.json() as Promise<Record<string, PlayerMeta>>;
