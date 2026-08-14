@@ -27,6 +27,9 @@ describe("simulatePlayoffOdds", () => {
       playoffTeams: 1,
       playoffWeeks: [],
       championRosterId: null,
+      draftPicks: [],
+      usesFaab: false,
+      faabSpends: [],
       teams: new Map([
         [1, { rosterId: 1, ownerId: "u1", name: "Team 1" }],
         [2, { rosterId: 2, ownerId: "u2", name: "Team 2" }],
@@ -53,6 +56,9 @@ describe("simulatePlayoffOdds", () => {
       playoffTeams: 1,
       playoffWeeks: [],
       championRosterId: null,
+      draftPicks: [],
+      usesFaab: false,
+      faabSpends: [],
       teams: new Map([
         [1, { rosterId: 1, ownerId: "u1", name: "Team 1" }],
         [2, { rosterId: 2, ownerId: "u2", name: "Team 2" }],
@@ -76,6 +82,9 @@ describe("simulatePlayoffOdds", () => {
       playoffTeams: 2,
       playoffWeeks: [],
       championRosterId: null,
+      draftPicks: [],
+      usesFaab: false,
+      faabSpends: [],
       teams: new Map([
         [1, { rosterId: 1, ownerId: "u1", name: "Team 1" }],
         [2, { rosterId: 2, ownerId: "u2", name: "Team 2" }],

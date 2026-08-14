@@ -1,24 +1,39 @@
 import { cached, TTL } from "./cache";
 import type {
+  RawDraftPick,
   RawNflState,
+  RawSleeperDraft,
   RawSleeperLeague,
   RawSleeperLeagueUser,
   RawSleeperMatchupEntry,
   RawSleeperRoster,
   RawSleeperUser,
+  RawTransaction,
   RawWinnersBracketEntry,
 } from "./types";
 import {
   buildManagers,
   buildTeams,
   championRosterIdFromBracket,
+  toDraftPick,
+  toFaabSpends,
   toLeagueSummary,
   toRemainingWeek,
   toSeason,
   toSleeperUser,
   toWeek,
 } from "../data/normalize";
-import type { LeagueData, LeagueSummary, Manager, RemainingWeek, Season, SleeperUser, Week } from "../data/types";
+import type {
+  DraftPick,
+  FaabSpend,
+  LeagueData,
+  LeagueSummary,
+  Manager,
+  RemainingWeek,
+  Season,
+  SleeperUser,
+  Week,
+} from "../data/types";
 
 const BASE_URL = "https://api.sleeper.app/v1";
 
@@ -178,15 +193,52 @@ async function fetchLeagueChain(leagueId: string): Promise<RawSleeperLeague[]> {
   return chain;
 }
 
+async function getLeagueDrafts(leagueId: string): Promise<RawSleeperDraft[]> {
+  const key = `sleeper:${leagueId}:drafts`;
+  return cached<RawSleeperDraft[]>(key, TTL.IMMUTABLE, () => fetchJson<RawSleeperDraft[]>(`/league/${leagueId}/drafts`));
+}
+
+async function getDraftPicks(draftId: string): Promise<RawDraftPick[]> {
+  const key = `sleeper:draft:${draftId}:picks`;
+  return cached<RawDraftPick[]>(key, TTL.IMMUTABLE, () => fetchJson<RawDraftPick[]>(`/draft/${draftId}/picks`));
+}
+
+/** A league can (in principle) have more than one draft on record; the
+ * most recently created one is the real season draft. Leagues with no
+ * completed draft yet (or a draft that predates Sleeper draft tracking)
+ * just get an empty pick list rather than an error. */
+async function loadDraftPicks(leagueId: string): Promise<DraftPick[]> {
+  const drafts = await getLeagueDrafts(leagueId);
+  if (drafts.length === 0) return [];
+  const mostRecent = [...drafts].sort((a, b) => b.created - a.created)[0];
+  const picks = await getDraftPicks(mostRecent.draft_id);
+  return picks.map(toDraftPick);
+}
+
+async function getLeagueTransactions(leagueId: string, week: number): Promise<RawTransaction[]> {
+  const key = `sleeper:${leagueId}:transactions:${week}`;
+  return cached<RawTransaction[]>(key, TTL.IMMUTABLE, () =>
+    fetchJson<RawTransaction[]>(`/league/${leagueId}/transactions/${week}`),
+  );
+}
+
+async function loadFaabSpends(league: RawSleeperLeague, weekNumbers: number[]): Promise<FaabSpend[]> {
+  if (league.settings?.waiver_type !== 2) return []; // not an FAAB league, skip the fetch entirely
+  const byWeek = await Promise.all(weekNumbers.map((week) => getLeagueTransactions(league.league_id, week)));
+  return weekNumbers.flatMap((week, i) => toFaabSpends(week, byWeek[i]));
+}
+
 async function loadFullSeason(league: RawSleeperLeague): Promise<{ season: Season; rawUsers: RawSleeperLeagueUser[] }> {
   const weekNumbers = allScoredWeeks(league);
   const playoffStart = league.settings?.playoff_week_start ?? 15;
 
-  const [rawUsers, rawRosters, entriesByWeek, bracket] = await Promise.all([
+  const [rawUsers, rawRosters, entriesByWeek, bracket, draftPicks, faabSpends] = await Promise.all([
     getLeagueUsers(league.league_id),
     getLeagueRosters(league.league_id),
     Promise.all(weekNumbers.map((week) => getLeagueMatchups(league.league_id, week, TTL.IMMUTABLE))),
     getWinnersBracket(league.league_id),
+    loadDraftPicks(league.league_id),
+    loadFaabSpends(league, weekNumbers),
   ]);
 
   const teams = buildTeams(rawRosters, rawUsers);
@@ -199,7 +251,7 @@ async function loadFullSeason(league: RawSleeperLeague): Promise<{ season: Seaso
   });
 
   const championRosterId = championRosterIdFromBracket(bracket);
-  const season = toSeason(league, teams, regularWeeks, [], { playoffWeeks, championRosterId });
+  const season = toSeason(league, teams, regularWeeks, [], { playoffWeeks, championRosterId, draftPicks, faabSpends });
   return { season, rawUsers };
 }
 

@@ -48,6 +48,24 @@ export interface Season {
   remainingWeeks: RemainingWeek[]; // scheduled-but-unplayed regular-season weeks, ascending
   playoffWeeks: Week[]; // completed playoff-bracket weeks, ascending — only populated by the multi-season history loader (M6), empty otherwise
   championRosterId: RosterId | null; // winner of the championship game (winners_bracket placement 1); null unless loaded via history
+  draftPicks: DraftPick[]; // this season's draft, empty unless loaded via history
+  usesFaab: boolean; // waiver_type === FAAB; if false, faabSpends is always empty
+  faabSpends: FaabSpend[]; // winning waiver claims that spent FAAB budget, empty unless loaded via history
+}
+
+export interface DraftPick {
+  round: number;
+  pickNo: number; // overall pick number
+  playerId: string;
+  position: string; // player's position at draft time
+  pickedByUserId: UserId;
+}
+
+export interface FaabSpend {
+  playerId: string;
+  rosterId: RosterId;
+  amount: number;
+  week: number; // the week the claim was made, so "value gained" only counts points scored after acquisition
 }
 
 /** A future week's matchup pairings — the schedule is known in advance,

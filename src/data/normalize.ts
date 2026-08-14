@@ -1,12 +1,16 @@
 import type {
+  RawDraftPick,
   RawSleeperLeague,
   RawSleeperLeagueUser,
   RawSleeperMatchupEntry,
   RawSleeperRoster,
   RawSleeperUser,
+  RawTransaction,
   RawWinnersBracketEntry,
 } from "../api/types";
 import type {
+  DraftPick,
+  FaabSpend,
   Game,
   LeagueSummary,
   Manager,
@@ -78,7 +82,12 @@ export function toSeason(
   teams: Map<RosterId, Team>,
   weeks: Week[] = [],
   remainingWeeks: RemainingWeek[] = [],
-  extras: { playoffWeeks?: Week[]; championRosterId?: RosterId | null } = {},
+  extras: {
+    playoffWeeks?: Week[];
+    championRosterId?: RosterId | null;
+    draftPicks?: DraftPick[];
+    faabSpends?: FaabSpend[];
+  } = {},
 ): Season {
   return {
     leagueId: league.league_id,
@@ -92,7 +101,36 @@ export function toSeason(
     remainingWeeks,
     playoffWeeks: extras.playoffWeeks ?? [],
     championRosterId: extras.championRosterId ?? null,
+    draftPicks: extras.draftPicks ?? [],
+    usesFaab: league.settings?.waiver_type === 2,
+    faabSpends: extras.faabSpends ?? [],
   };
+}
+
+export function toDraftPick(raw: RawDraftPick): DraftPick {
+  return {
+    round: raw.round,
+    pickNo: raw.pick_no,
+    playerId: raw.player_id,
+    position: raw.metadata?.position ?? "UNK",
+    pickedByUserId: raw.picked_by,
+  };
+}
+
+/** Only completed waiver claims that actually spent FAAB budget count —
+ * free_agent adds and $0 claims don't represent a real bidding decision. */
+export function toFaabSpends(week: number, transactions: RawTransaction[]): FaabSpend[] {
+  const spends: FaabSpend[] = [];
+  for (const txn of transactions) {
+    if (txn.type !== "waiver" || txn.status !== "complete") continue;
+    const amount = txn.settings?.waiver_bid;
+    if (!amount || amount <= 0) continue;
+    if (!txn.adds) continue;
+    for (const [playerId, rosterId] of Object.entries(txn.adds)) {
+      spends.push({ playerId, rosterId, amount, week });
+    }
+  }
+  return spends;
 }
 
 /** The winners_bracket entry with p===1 decides the championship — its
