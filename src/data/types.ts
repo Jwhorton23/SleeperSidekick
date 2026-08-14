@@ -46,6 +46,8 @@ export interface Season {
   teams: Map<RosterId, Team>;
   weeks: Week[]; // completed regular-season weeks, ascending
   remainingWeeks: RemainingWeek[]; // scheduled-but-unplayed regular-season weeks, ascending
+  playoffWeeks: Week[]; // completed playoff-bracket weeks, ascending — only populated by the multi-season history loader (M6), empty otherwise
+  championRosterId: RosterId | null; // winner of the championship game (winners_bracket placement 1); null unless loaded via history
 }
 
 /** A future week's matchup pairings — the schedule is known in advance,
