@@ -1,7 +1,14 @@
 import { cached, TTL } from "./cache";
-import type { RawNflState, RawSleeperLeague, RawSleeperLeagueUser, RawSleeperRoster, RawSleeperUser } from "./types";
-import { buildManagers, buildTeams, toLeagueSummary, toSeason, toSleeperUser } from "../data/normalize";
-import type { LeagueData, LeagueSummary, SleeperUser } from "../data/types";
+import type {
+  RawNflState,
+  RawSleeperLeague,
+  RawSleeperLeagueUser,
+  RawSleeperMatchupEntry,
+  RawSleeperRoster,
+  RawSleeperUser,
+} from "./types";
+import { buildManagers, buildTeams, toLeagueSummary, toSeason, toSleeperUser, toWeek } from "../data/normalize";
+import type { LeagueData, LeagueSummary, SleeperUser, Week } from "../data/types";
 
 const BASE_URL = "https://api.sleeper.app/v1";
 
@@ -68,14 +75,42 @@ async function getLeagueRosters(leagueId: string): Promise<RawSleeperRoster[]> {
   );
 }
 
+/** Regular-season weeks that have been scored, per PLAN.md's "regular
+ * season weeks only" rule for the MVP stats — playoff/consolation weeks
+ * would otherwise pollute all-play/luck/coaching-efficiency numbers. */
+function regularSeasonWeeksPlayed(league: RawSleeperLeague): number[] {
+  const playoffStart = league.settings?.playoff_week_start ?? 15;
+  const lastScored = league.settings?.last_scored_leg ?? playoffStart - 1;
+  const lastRegularWeek = Math.max(0, Math.min(playoffStart - 1, lastScored));
+  return Array.from({ length: lastRegularWeek }, (_, i) => i + 1);
+}
+
+async function getLeagueMatchups(leagueId: string, week: number, isLatestScoredWeek: boolean): Promise<RawSleeperMatchupEntry[]> {
+  const key = `sleeper:${leagueId}:matchups:${week}`;
+  const ttl = isLatestScoredWeek ? TTL.SEMI_STABLE : TTL.IMMUTABLE;
+  return cached<RawSleeperMatchupEntry[]>(key, ttl, () =>
+    fetchJson<RawSleeperMatchupEntry[]>(`/league/${leagueId}/matchups/${week}`),
+  );
+}
+
+async function loadWeeks(league: RawSleeperLeague): Promise<Week[]> {
+  const weekNumbers = regularSeasonWeeksPlayed(league);
+  const lastWeek = weekNumbers.at(-1);
+  const entriesByWeek = await Promise.all(
+    weekNumbers.map((week) => getLeagueMatchups(league.league_id, week, week === lastWeek)),
+  );
+  return weekNumbers.map((week, i) => toWeek(week, entriesByWeek[i]));
+}
+
 export async function loadLeagueData(leagueId: string): Promise<LeagueData> {
   const activeLeague = await resolveActiveSeasonLeague(leagueId);
-  const [rawUsers, rawRosters] = await Promise.all([
+  const [rawUsers, rawRosters, weeks] = await Promise.all([
     getLeagueUsers(activeLeague.league_id),
     getLeagueRosters(activeLeague.league_id),
+    loadWeeks(activeLeague),
   ]);
   const managers = buildManagers(rawUsers);
   const teams = buildTeams(rawRosters, rawUsers);
-  const season = toSeason(activeLeague, teams);
+  const season = toSeason(activeLeague, teams, weeks);
   return { managers, seasons: [season] };
 }
