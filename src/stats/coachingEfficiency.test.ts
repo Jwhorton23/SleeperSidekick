@@ -37,6 +37,9 @@ const season: Season = {
   playoffTeams: 6,
   playoffWeeks: [],
   championRosterId: null,
+  draftPicks: [],
+  usesFaab: false,
+  faabSpends: [],
   teams: new Map([[1, { rosterId: 1, ownerId: "872714529828732928", name: "BC Let's Ride" }]]),
   remainingWeeks: [],
   weeks: [
@@ -124,6 +127,9 @@ const superflexSeason: Season = {
   playoffTeams: 6,
   playoffWeeks: [],
   championRosterId: null,
+  draftPicks: [],
+  usesFaab: false,
+  faabSpends: [],
   teams: new Map([[1, { rosterId: 1, ownerId: "unknown", name: "Roster 1" }]]),
   remainingWeeks: [],
   weeks: [

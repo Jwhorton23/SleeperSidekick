@@ -21,6 +21,7 @@ export interface RawSleeperLeague {
     playoff_week_start?: number;
     last_scored_leg?: number;
     playoff_teams?: number;
+    waiver_type?: number; // 2 = FAAB bidding; other values are priority-based waivers
   };
 }
 
@@ -59,4 +60,28 @@ export interface RawWinnersBracketEntry {
   t1?: number | null;
   t2?: number | null;
   p?: number | null; // placement this game decides; 1 = the championship game
+}
+
+export interface RawSleeperDraft {
+  draft_id: string;
+  season: string;
+  status: string;
+  created: number;
+}
+
+export interface RawDraftPick {
+  round: number;
+  pick_no: number;
+  player_id: string;
+  picked_by: string; // user_id; empty string if the slot went unclaimed (e.g. an orphaned roster)
+  roster_id: number;
+  metadata?: { position?: string } | null;
+}
+
+export interface RawTransaction {
+  type: string; // "waiver" | "free_agent" | "trade"
+  status: string; // only "complete" transactions actually happened
+  roster_ids: number[];
+  adds: Record<string, number> | null; // player_id -> roster_id
+  settings?: { waiver_bid?: number } | null; // waiver_bid is the FAAB amount spent, for "waiver"-type transactions in an FAAB league
 }

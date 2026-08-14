@@ -28,6 +28,9 @@ const season2024: Season = {
   remainingWeeks: [],
   playoffWeeks: [],
   championRosterId: 1, // u1 won the 2024 title
+  draftPicks: [],
+  usesFaab: false,
+  faabSpends: [],
 };
 
 const season2025: Season = {
@@ -48,6 +51,9 @@ const season2025: Season = {
   remainingWeeks: [],
   playoffWeeks: [],
   championRosterId: 1, // roster 1 this season is u2 — tests season-scoped resolution
+  draftPicks: [],
+  usesFaab: false,
+  faabSpends: [],
 };
 
 const leagueData: LeagueData = {
