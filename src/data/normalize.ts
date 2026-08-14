@@ -4,6 +4,7 @@ import type {
   RawSleeperMatchupEntry,
   RawSleeperRoster,
   RawSleeperUser,
+  RawWinnersBracketEntry,
 } from "../api/types";
 import type {
   Game,
@@ -77,6 +78,7 @@ export function toSeason(
   teams: Map<RosterId, Team>,
   weeks: Week[] = [],
   remainingWeeks: RemainingWeek[] = [],
+  extras: { playoffWeeks?: Week[]; championRosterId?: RosterId | null } = {},
 ): Season {
   return {
     leagueId: league.league_id,
@@ -88,7 +90,17 @@ export function toSeason(
     teams,
     weeks,
     remainingWeeks,
+    playoffWeeks: extras.playoffWeeks ?? [],
+    championRosterId: extras.championRosterId ?? null,
   };
+}
+
+/** The winners_bracket entry with p===1 decides the championship — its
+ * winner (`w`) is the season champion. Returns null for an unfinished or
+ * missing bracket. */
+export function championRosterIdFromBracket(bracket: RawWinnersBracketEntry[]): RosterId | null {
+  const championshipGame = bracket.find((entry) => entry.p === 1);
+  return championshipGame?.w ?? null;
 }
 
 function toTeamWeek(entry: RawSleeperMatchupEntry): TeamWeek {

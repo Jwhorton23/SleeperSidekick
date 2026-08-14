@@ -50,3 +50,13 @@ export interface RawNflState {
   week: number;
   season_type: string;
 }
+
+export interface RawWinnersBracketEntry {
+  r: number; // round
+  m: number; // matchup id within the bracket
+  w?: number | null; // winning roster_id, once played
+  l?: number | null; // losing roster_id, once played
+  t1?: number | null;
+  t2?: number | null;
+  p?: number | null; // placement this game decides; 1 = the championship game
+}

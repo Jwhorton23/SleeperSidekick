@@ -6,17 +6,19 @@ import type {
   RawSleeperMatchupEntry,
   RawSleeperRoster,
   RawSleeperUser,
+  RawWinnersBracketEntry,
 } from "./types";
 import {
   buildManagers,
   buildTeams,
+  championRosterIdFromBracket,
   toLeagueSummary,
   toRemainingWeek,
   toSeason,
   toSleeperUser,
   toWeek,
 } from "../data/normalize";
-import type { LeagueData, LeagueSummary, RemainingWeek, SleeperUser, Week } from "../data/types";
+import type { LeagueData, LeagueSummary, Manager, RemainingWeek, Season, SleeperUser, Week } from "../data/types";
 
 const BASE_URL = "https://api.sleeper.app/v1";
 
@@ -142,4 +144,84 @@ export async function loadLeagueData(leagueId: string): Promise<LeagueData> {
   const teams = buildTeams(rawRosters, rawUsers);
   const season = toSeason(activeLeague, teams, weeks, remainingWeeks);
   return { managers, seasons: [season] };
+}
+
+async function getWinnersBracket(leagueId: string): Promise<RawWinnersBracketEntry[]> {
+  const key = `sleeper:${leagueId}:winners_bracket`;
+  return cached<RawWinnersBracketEntry[]>(key, TTL.IMMUTABLE, () =>
+    fetchJson<RawWinnersBracketEntry[]>(`/league/${leagueId}/winners_bracket`),
+  );
+}
+
+/** Every scored week of the season, regular season and playoffs alike —
+ * unlike regularSeasonWeeksPlayed, this is for the record book, which
+ * cares about complete history, not just the MVP stats' apples-to-apples
+ * regular-season comparison. */
+function allScoredWeeks(league: RawSleeperLeague): number[] {
+  const lastScored = Math.max(0, league.settings?.last_scored_leg ?? 0);
+  return Array.from({ length: lastScored }, (_, i) => i + 1);
+}
+
+/** Walks previous_league_id all the way back (not just past pre_draft
+ * heads like resolveActiveSeasonLeague), collecting every season of this
+ * league's history, newest first. */
+async function fetchLeagueChain(leagueId: string): Promise<RawSleeperLeague[]> {
+  const active = await resolveActiveSeasonLeague(leagueId);
+  const chain: RawSleeperLeague[] = [active];
+  const visited = new Set([active.league_id]);
+  let current = active;
+  while (current.previous_league_id && !visited.has(current.previous_league_id)) {
+    visited.add(current.previous_league_id);
+    current = await fetchRawLeague(current.previous_league_id);
+    chain.push(current);
+  }
+  return chain;
+}
+
+async function loadFullSeason(league: RawSleeperLeague): Promise<{ season: Season; rawUsers: RawSleeperLeagueUser[] }> {
+  const weekNumbers = allScoredWeeks(league);
+  const playoffStart = league.settings?.playoff_week_start ?? 15;
+
+  const [rawUsers, rawRosters, entriesByWeek, bracket] = await Promise.all([
+    getLeagueUsers(league.league_id),
+    getLeagueRosters(league.league_id),
+    Promise.all(weekNumbers.map((week) => getLeagueMatchups(league.league_id, week, TTL.IMMUTABLE))),
+    getWinnersBracket(league.league_id),
+  ]);
+
+  const teams = buildTeams(rawRosters, rawUsers);
+  const regularWeeks: Week[] = [];
+  const playoffWeeks: Week[] = [];
+  weekNumbers.forEach((week, i) => {
+    const parsed = toWeek(week, entriesByWeek[i]);
+    if (week < playoffStart) regularWeeks.push(parsed);
+    else playoffWeeks.push(parsed);
+  });
+
+  const championRosterId = championRosterIdFromBracket(bracket);
+  const season = toSeason(league, teams, regularWeeks, [], { playoffWeeks, championRosterId });
+  return { season, rawUsers };
+}
+
+/**
+ * Full multi-season history via the previous_league_id chain (PLAN.md
+ * §5 M6). Deliberately separate from loadLeagueData: the Dashboard's
+ * per-season stats need to load fast, and most leagues only have one or
+ * two prior seasons right now, but this still fetches every week
+ * (including playoffs) of every season found, which is meaningfully
+ * more data — it's opt-in, not part of the fast path.
+ */
+export async function loadLeagueHistory(leagueId: string): Promise<LeagueData> {
+  const chain = await fetchLeagueChain(leagueId); // newest first
+  const loaded = await Promise.all(chain.map(loadFullSeason));
+
+  // Merge managers oldest-to-newest so the most recent display name wins.
+  const managers = new Map<string, Manager>();
+  for (const { rawUsers } of [...loaded].reverse()) {
+    for (const [userId, manager] of buildManagers(rawUsers)) {
+      managers.set(userId, manager);
+    }
+  }
+
+  return { managers, seasons: loaded.map((entry) => entry.season) };
 }

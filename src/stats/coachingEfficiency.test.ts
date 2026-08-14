@@ -35,6 +35,8 @@ const season: Season = {
   starterSlots: ["QB", "RB", "RB", "WR", "WR", "TE", "FLEX", "K", "DEF"],
   playoffWeekStart: 15,
   playoffTeams: 6,
+  playoffWeeks: [],
+  championRosterId: null,
   teams: new Map([[1, { rosterId: 1, ownerId: "872714529828732928", name: "BC Let's Ride" }]]),
   remainingWeeks: [],
   weeks: [
@@ -120,6 +122,8 @@ const superflexSeason: Season = {
   starterSlots: ["QB", "RB", "RB", "WR", "WR", "TE", "FLEX", "SUPER_FLEX", "K", "DEF"],
   playoffWeekStart: 15,
   playoffTeams: 6,
+  playoffWeeks: [],
+  championRosterId: null,
   teams: new Map([[1, { rosterId: 1, ownerId: "unknown", name: "Roster 1" }]]),
   remainingWeeks: [],
   weeks: [
