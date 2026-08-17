@@ -253,7 +253,8 @@ export const METRIC_INFO: Record<MetricKey, MetricInfo> = {
     subtitle: "Every game this season, with what the box score doesn't show.",
     howItWorks: [
       "The result line is the real matchup: this team's score, the opponent's, and who won.",
-      "The second line adds how many of the league's other teams this score would have beaten that week, and how many points were left sitting on the bench.",
+      "The bullets underneath add how many of the league's other teams this score would have beaten that week, how many points were left sitting on the bench, and the top starter.",
+      "Bullet colors grade the week: green is good, yellow and orange are middling, red is bad. The top starter is blue because it's context, not a verdict.",
     ],
     readingIt:
       "A loss where you beat 6 of 7 other teams is the schedule's fault. A win where you beat 1 of 7 is a gift. Bench points on top of a narrow loss are the ones that sting.",
