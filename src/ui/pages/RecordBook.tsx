@@ -1,12 +1,14 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router";
 import { loadLeagueHistory } from "../../api/client";
 import { loadPlayerIndex } from "../../data/players";
 import type { LeagueData, PlayerMeta, UserId } from "../../data/types";
-import { careerRecords, headToHeadMatrix } from "../../stats/careerRecords";
-import { careerDraftHitRates } from "../../stats/draftGrades";
+import { careerRecords, headToHeadMatrix, type CareerRecord, type HeadToHeadRecord } from "../../stats/careerRecords";
+import { careerDraftHitRates, type SeasonDraftPickGrade } from "../../stats/draftGrades";
 import { faabEfficiency } from "../../stats/faabEfficiency";
 import { seasonAwards } from "../../stats/seasonAwards";
+import { StatCard } from "../components/StatCard";
+import { ordinal, recordLabel } from "../format";
 
 type LoadState =
   | { status: "loading" }
@@ -36,6 +38,15 @@ export function RecordBook() {
     };
   }, [leagueId]);
 
+  const data = state.status === "ready" ? state.data : null;
+  // Both of these walk every game of every season, and four cards need them —
+  // compute once here rather than per card.
+  const records = useMemo(() => (data ? careerRecords(data) : new Map<UserId, CareerRecord>()), [data]);
+  const h2h = useMemo(
+    () => (data ? headToHeadMatrix(data) : new Map<UserId, Map<UserId, HeadToHeadRecord>>()),
+    [data],
+  );
+
   if (state.status === "loading") {
     return (
       <main className="page">
@@ -52,27 +63,26 @@ export function RecordBook() {
     );
   }
 
-  const { data } = state;
-  const seasons = [...data.seasons].reverse(); // oldest first, for display
-  const managerName = (userId: UserId) => data.managers.get(userId)?.displayName ?? "Unknown manager";
+  const seasons = [...state.data.seasons].reverse(); // oldest first, for display
+  const managerName = (userId: UserId) => state.data.managers.get(userId)?.displayName ?? "Unknown manager";
 
   return (
     <main className="page">
       <Link to={`/league/${leagueId}`} className="back-link">
         &larr; Back
       </Link>
-      <h1>{data.seasons[0]?.name ?? "Record Book"}</h1>
+      <h1>{state.data.seasons[0]?.name ?? "Record Book"}</h1>
       <p className="subtitle">
         {seasons.length === 1 ? seasons[0].season : `${seasons[0].season}–${seasons.at(-1)!.season}`} record book
       </p>
 
-      <SeasonAwardsCard data={data} playerIndex={state.playerIndex} managerName={managerName} />
-      <CareerPointsCard data={data} managerName={managerName} />
-      <ChampionshipsCard data={data} managerName={managerName} />
-      <StreaksCard data={data} managerName={managerName} />
-      <RivalriesCard data={data} managerName={managerName} />
-      <DraftGradesCard data={data} managerName={managerName} />
-      <FaabEfficiencyCard data={data} managerName={managerName} />
+      <SeasonAwardsCard data={state.data} playerIndex={state.playerIndex} managerName={managerName} />
+      <CareerPointsCard records={records} managerName={managerName} />
+      <ChampionshipsCard records={records} managerName={managerName} />
+      <StreaksCard records={records} managerName={managerName} />
+      <RivalriesCard h2h={h2h} managerName={managerName} />
+      <DraftGradesCard data={state.data} playerIndex={state.playerIndex} managerName={managerName} />
+      <FaabEfficiencyCard data={state.data} managerName={managerName} />
     </main>
   );
 }
@@ -92,8 +102,7 @@ function SeasonAwardsCard({
   if (awards.length === 0) return null;
 
   return (
-    <section className="stat-card">
-      <h2>{latestSeason.season} Season Awards</h2>
+    <StatCard metric="seasonAwards" title={`${latestSeason.season} Season Awards`}>
       <ul className="stat-list">
         {awards.map((award) => (
           <li key={award.key} className="stat-row">
@@ -104,35 +113,58 @@ function SeasonAwardsCard({
           </li>
         ))}
       </ul>
-    </section>
+    </StatCard>
   );
 }
 
-function DraftGradesCard({ data, managerName }: { data: LeagueData; managerName: (id: UserId) => string }) {
+/** "12th WR taken, finished 3rd among them" — spelling out that the ranking is
+ * against the other players at that position taken in the same draft, which is
+ * the part of the hit-rate math nobody guesses correctly. */
+function pickSummary(entry: SeasonDraftPickGrade, playerIndex: Map<string, PlayerMeta>, showSeason: boolean): string {
+  const { pick, positionalDraftRank, positionalFinishRank } = entry.grade;
+  const name = playerIndex.get(pick.playerId)?.name ?? "Unknown player";
+  const season = showSeason ? ` (${entry.season})` : "";
+  return `${name}${season} — ${ordinal(positionalDraftRank)} ${pick.position} taken, finished ${ordinal(positionalFinishRank)} among them`;
+}
+
+function DraftGradesCard({
+  data,
+  playerIndex,
+  managerName,
+}: {
+  data: LeagueData;
+  playerIndex: Map<string, PlayerMeta>;
+  managerName: (id: UserId) => string;
+}) {
   const rates = [...careerDraftHitRates(data).entries()]
     .filter(([, r]) => r.totalPicks > 0)
     .sort((a, b) => b[1].hitRate - a[1].hitRate);
 
   if (rates.length === 0) return null;
+  const showSeason = data.seasons.length > 1;
 
   return (
-    <section className="stat-card">
-      <h2>Draft Grades</h2>
-      <p className="stat-card-subtitle">
-        Hit rate: how often a pick finished at least as well, among same-position picks in that draft, as where it
-        was taken.
-      </p>
+    <StatCard metric="draftGrades">
       <ul className="stat-list">
         {rates.map(([userId, r]) => (
           <li key={userId} className="stat-row">
             <span className="stat-row-name">{managerName(userId)}</span>
             <span className="stat-row-value">
-              {Math.round(r.hitRate * 100)}% &middot; {r.hits}/{r.totalPicks} picks
+              {r.hits} of {r.totalPicks} picks hit &middot; {Math.round(r.hitRate * 100)}%
             </span>
+            {(r.bestPick || r.worstPick) && (
+              <details className="row-details">
+                <summary>Best and worst pick</summary>
+                <div className="row-details-body">
+                  {r.bestPick && <span>Best: {pickSummary(r.bestPick, playerIndex, showSeason)}</span>}
+                  {r.worstPick && <span>Worst: {pickSummary(r.worstPick, playerIndex, showSeason)}</span>}
+                </div>
+              </details>
+            )}
           </li>
         ))}
       </ul>
-    </section>
+    </StatCard>
   );
 }
 
@@ -160,9 +192,7 @@ function FaabEfficiencyCard({ data, managerName }: { data: LeagueData; managerNa
   if (rows.length === 0) return null;
 
   return (
-    <section className="stat-card">
-      <h2>FAAB Efficiency</h2>
-      <p className="stat-card-subtitle">Points scored per FAAB dollar spent on winning waiver claims.</p>
+    <StatCard metric="faabEfficiency">
       <ul className="stat-list">
         {rows.map((row) => (
           <li key={row.userId} className="stat-row">
@@ -173,40 +203,53 @@ function FaabEfficiencyCard({ data, managerName }: { data: LeagueData; managerNa
           </li>
         ))}
       </ul>
-    </section>
+    </StatCard>
   );
 }
 
-function CareerPointsCard({ data, managerName }: { data: LeagueData; managerName: (id: UserId) => string }) {
-  const records = [...careerRecords(data).values()].sort((a, b) => b.careerPoints - a.careerPoints);
+function CareerPointsCard({
+  records,
+  managerName,
+}: {
+  records: Map<UserId, CareerRecord>;
+  managerName: (id: UserId) => string;
+}) {
+  const rows = [...records.values()].sort((a, b) => b.careerPoints - a.careerPoints);
 
   return (
-    <section className="stat-card">
-      <h2>Career Points</h2>
+    <StatCard metric="careerPoints">
       <ul className="stat-list">
-        {records.map((r) => (
+        {rows.map((r) => (
           <li key={r.userId} className="stat-row">
             <span className="stat-row-name">{managerName(r.userId)}</span>
-            <span className="stat-row-value">{r.careerPoints.toFixed(1)} pts</span>
+            <span className="stat-row-value">
+              {r.careerPoints.toFixed(1)} pts &middot; {r.seasonsPlayed.length}{" "}
+              {r.seasonsPlayed.length === 1 ? "season" : "seasons"}
+            </span>
           </li>
         ))}
       </ul>
-    </section>
+    </StatCard>
   );
 }
 
-function ChampionshipsCard({ data, managerName }: { data: LeagueData; managerName: (id: UserId) => string }) {
-  const records = [...careerRecords(data).values()]
+function ChampionshipsCard({
+  records,
+  managerName,
+}: {
+  records: Map<UserId, CareerRecord>;
+  managerName: (id: UserId) => string;
+}) {
+  const rows = [...records.values()]
     .filter((r) => r.championships.length > 0)
     .sort((a, b) => b.championships.length - a.championships.length);
 
-  if (records.length === 0) return null;
+  if (rows.length === 0) return null;
 
   return (
-    <section className="stat-card">
-      <h2>Championships</h2>
+    <StatCard metric="championships">
       <ul className="stat-list">
-        {records.map((r) => (
+        {rows.map((r) => (
           <li key={r.userId} className="stat-row">
             <span className="stat-row-name">{managerName(r.userId)}</span>
             <span className="stat-row-value">
@@ -215,33 +258,43 @@ function ChampionshipsCard({ data, managerName }: { data: LeagueData; managerNam
           </li>
         ))}
       </ul>
-    </section>
+    </StatCard>
   );
 }
 
-function StreaksCard({ data, managerName }: { data: LeagueData; managerName: (id: UserId) => string }) {
-  const records = [...careerRecords(data).values()].sort((a, b) => b.longestWinStreak - a.longestWinStreak);
+function StreaksCard({
+  records,
+  managerName,
+}: {
+  records: Map<UserId, CareerRecord>;
+  managerName: (id: UserId) => string;
+}) {
+  const rows = [...records.values()].sort((a, b) => b.longestWinStreak - a.longestWinStreak);
 
   return (
-    <section className="stat-card">
-      <h2>Longest Win Streak</h2>
+    <StatCard metric="winStreak">
       <ul className="stat-list">
-        {records.map((r) => (
+        {rows.map((r) => (
           <li key={r.userId} className="stat-row">
             <span className="stat-row-name">{managerName(r.userId)}</span>
-            <span className="stat-row-value">{r.longestWinStreak} games</span>
+            <span className="stat-row-value">{r.longestWinStreak} straight wins</span>
           </li>
         ))}
       </ul>
-    </section>
+    </StatCard>
   );
 }
 
-function RivalriesCard({ data, managerName }: { data: LeagueData; managerName: (id: UserId) => string }) {
-  const matrix = headToHeadMatrix(data);
-  const rows = [...matrix.entries()]
+function RivalriesCard({
+  h2h,
+  managerName,
+}: {
+  h2h: Map<UserId, Map<UserId, HeadToHeadRecord>>;
+  managerName: (id: UserId) => string;
+}) {
+  const rows = [...h2h.entries()]
     .map(([userId, opponents]) => {
-      let best: { opponentId: UserId; wins: number; losses: number; ties: number } | null = null;
+      let best: ({ opponentId: UserId } & HeadToHeadRecord) | null = null;
       for (const [opponentId, record] of opponents) {
         const diff = record.wins - record.losses;
         const bestDiff = best ? best.wins - best.losses : -Infinity;
@@ -255,20 +308,17 @@ function RivalriesCard({ data, managerName }: { data: LeagueData; managerName: (
   if (rows.length === 0) return null;
 
   return (
-    <section className="stat-card">
-      <h2>Rivalries</h2>
-      <p className="stat-card-subtitle">Each manager's most dominant head-to-head matchup.</p>
+    <StatCard metric="rivalries">
       <ul className="stat-list">
         {rows.map((row) => (
           <li key={row.userId} className="stat-row">
             <span className="stat-row-name">{managerName(row.userId)}</span>
             <span className="stat-row-value">
-              vs {managerName(row.opponentId)}: {row.wins}-{row.losses}
-              {row.ties > 0 ? `-${row.ties}` : ""}
+              vs {managerName(row.opponentId)}: {recordLabel(row)}
             </span>
           </li>
         ))}
       </ul>
-    </section>
+    </StatCard>
   );
 }

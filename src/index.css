@@ -156,6 +156,107 @@ h1 {
   margin: 0 0 var(--space-1);
 }
 
+.stat-card-header {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+}
+
+.info-button {
+  flex: none;
+  width: 1.25rem;
+  height: 1.25rem;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+  font-family: Georgia, "Times New Roman", serif;
+  font-style: italic;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.info-button:hover,
+.info-button:focus-visible {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
+dialog.metric-info {
+  max-width: 26rem;
+  width: calc(100vw - 2 * var(--space-3));
+  padding: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+
+dialog.metric-info::backdrop {
+  background: rgb(0 0 0 / 0.6);
+}
+
+.metric-info-body {
+  padding: var(--space-3);
+}
+
+.metric-info-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.metric-info-header h3 {
+  font-size: 1.1rem;
+  margin: 0;
+}
+
+.metric-info-close {
+  flex: none;
+  border: none;
+  background: none;
+  color: var(--color-text-muted);
+  font-size: 1.5rem;
+  line-height: 1;
+  padding: 0;
+  cursor: pointer;
+}
+
+.metric-info-lede {
+  margin: var(--space-2) 0 0;
+}
+
+.metric-info h4 {
+  font-size: 0.8125rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-muted);
+  margin: var(--space-3) 0 var(--space-1);
+}
+
+.metric-info ul {
+  margin: 0;
+  padding-left: 1.1rem;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.metric-info p {
+  margin: 0;
+}
+
+.metric-info-counts {
+  margin-top: var(--space-3);
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+  font-size: 0.8125rem;
+}
+
 .stat-card-subtitle {
   color: var(--color-text-muted);
   font-size: 0.8125rem;
@@ -204,4 +305,143 @@ h1 {
 
 .badge-negative {
   color: #f2777a;
+}
+
+/* A muted tag clarifying what a row's position in the list means, e.g.
+   "(luckiest)" on the top row of the luck card. */
+.stat-row-tag {
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+}
+
+/* Second line inside a stat row — takes the full width under the name/value. */
+.stat-row-note {
+  flex-basis: 100%;
+  color: var(--color-text-muted);
+  font-size: 0.8125rem;
+}
+
+/* ---- expandable rows (draft picks) ---- */
+
+.row-details {
+  flex-basis: 100%;
+}
+
+.row-details > summary {
+  color: var(--color-accent);
+  font-size: 0.8125rem;
+  cursor: pointer;
+  list-style: none;
+}
+
+.row-details > summary::-webkit-details-marker {
+  display: none;
+}
+
+.row-details > summary::before {
+  content: "▸ ";
+}
+
+.row-details[open] > summary::before {
+  content: "▾ ";
+}
+
+.row-details-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin-top: var(--space-2);
+  color: var(--color-text-muted);
+  font-size: 0.8125rem;
+}
+
+/* ---- manager page ---- */
+
+.manager-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+
+.manager-avatar {
+  width: 3rem;
+  height: 3rem;
+  border-radius: 50%;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  flex: none;
+  object-fit: cover;
+}
+
+.manager-header h1 {
+  margin: 0;
+}
+
+.season-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+
+.season-pill {
+  padding: var(--space-1) var(--space-3);
+  border-radius: 999px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+
+.season-pill[aria-pressed="true"] {
+  border-color: var(--color-accent);
+  color: var(--color-text);
+}
+
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+
+.kpi-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-1);
+  text-align: left;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: var(--space-2);
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  min-width: 0;
+}
+
+.kpi-tile:hover,
+.kpi-tile:focus-visible {
+  border-color: var(--color-accent);
+}
+
+.kpi-value {
+  font-size: 1.05rem;
+  font-weight: 600;
+  /* Long values (a 1,412.5 point total) must shrink rather than widen the
+     grid — .page is capped at 480px and there are no media queries. */
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.kpi-label {
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+}
+
+.section-heading {
+  font-size: 1.1rem;
+  margin: var(--space-4) 0 var(--space-2);
 }

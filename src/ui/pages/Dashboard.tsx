@@ -3,14 +3,15 @@ import { Link, useParams } from "react-router";
 import { loadLeagueData } from "../../api/client";
 import { loadPlayerIndex } from "../../data/players";
 import type { LeagueData, PlayerMeta, RosterId, Season } from "../../data/types";
-import { allPlay } from "../../stats/allPlay";
 import { coachingEfficiency } from "../../stats/coachingEfficiency";
 import { luckIndex } from "../../stats/luckIndex";
 import type { LuckIndexEntry } from "../../stats/luckIndex";
 import { powerRankings } from "../../stats/powerRankings";
 import { scheduleSwapMatrix } from "../../stats/scheduleSwap";
+import { pointsForByRoster } from "../../stats/teamLog";
 import { weeklyHighlights } from "../../stats/weeklyHighlights";
 import type { PlayoffOddsWorkerRequest, PlayoffOddsWorkerResponse } from "../../workers/playoffOdds.worker";
+import { StatCard } from "../components/StatCard";
 
 type LoadState =
   | { status: "loading" }
@@ -61,11 +62,17 @@ export function Dashboard() {
   const hasWeeks = season.weeks.length > 0;
 
   // Computed once here and passed down so cards that need the same data
-  // (the team list's sort order, the luck card) don't each recompute it.
+  // (the team list's sort order, the all-play and luck cards) don't each
+  // recompute it.
   const luck = hasWeeks ? luckIndex(season) : new Map<RosterId, LuckIndexEntry>();
-  const teams = [...season.teams.values()].sort(
-    (a, b) => (luck.get(b.rosterId)?.actualWins ?? 0) - (luck.get(a.rosterId)?.actualWins ?? 0),
-  );
+  const pointsFor = hasWeeks ? pointsForByRoster(season) : new Map<RosterId, number>();
+  const teams = [...season.teams.values()].sort((a, b) => {
+    const winDiff = (luck.get(b.rosterId)?.actualWins ?? 0) - (luck.get(a.rosterId)?.actualWins ?? 0);
+    if (winDiff !== 0) return winDiff;
+    // Points for is the league's own tiebreak; without it equal-win teams fall
+    // back to roster-id order, which looks arbitrary.
+    return (pointsFor.get(b.rosterId) ?? 0) - (pointsFor.get(a.rosterId) ?? 0);
+  });
 
   return (
     <main className="page">
@@ -83,10 +90,16 @@ export function Dashboard() {
       <ul className="league-list">
         {teams.map((team) => {
           const manager = state.data.managers.get(team.ownerId);
+          const entry = luck.get(team.rosterId);
           return (
-            <li key={team.rosterId} className="league-card">
-              <span className="league-name">{team.name}</span>
-              <span className="league-meta">{manager?.displayName ?? "Unknown manager"}</span>
+            <li key={team.rosterId}>
+              <Link to={`/league/${leagueId}/manager/${team.ownerId}`} className="league-card league-card-link">
+                <span className="league-name">{team.name}</span>
+                <span className="league-meta">
+                  {manager?.displayName ?? "Unknown manager"}
+                  {entry && ` · ${entry.record.wins}-${entry.record.losses}${entry.record.ties > 0 ? `-${entry.record.ties}` : ""}`}
+                </span>
+              </Link>
             </li>
           );
         })}
@@ -98,6 +111,7 @@ export function Dashboard() {
         <>
           <PlayoffOddsCard season={season} teamName={teamName} />
           <PowerRankingsCard season={season} teamName={teamName} />
+          <AllPlayCard season={season} luck={luck} teamName={teamName} />
           <LuckCard season={season} luck={luck} teamName={teamName} />
           <ScheduleSwapCard season={season} teamName={teamName} />
           <CoachingEfficiencyCard season={season} playerIndex={state.playerIndex} teamName={teamName} />
@@ -128,9 +142,7 @@ function PlayoffOddsCard({ season, teamName }: { season: Season; teamName: (id: 
   if (season.remainingWeeks.length === 0) return null;
 
   return (
-    <section className="stat-card">
-      <h2>Playoff Odds</h2>
-      <p className="stat-card-subtitle">10,000-season Monte Carlo simulation over the remaining schedule.</p>
+    <StatCard metric="playoffOdds">
       {!results ? (
         <p className="stat-card-subtitle">Simulating&hellip;</p>
       ) : (
@@ -138,12 +150,12 @@ function PlayoffOddsCard({ season, teamName }: { season: Season; teamName: (id: 
           {results.map((entry) => (
             <li key={entry.rosterId} className="stat-row">
               <span className="stat-row-name">{teamName(entry.rosterId)}</span>
-              <span className="stat-row-value">{entry.playoffPct.toFixed(1)}%</span>
+              <span className="stat-row-value">{entry.playoffPct.toFixed(1)}% to make the playoffs</span>
             </li>
           ))}
         </ul>
       )}
-    </section>
+    </StatCard>
   );
 }
 
@@ -151,20 +163,21 @@ function PowerRankingsCard({ season, teamName }: { season: Season; teamName: (id
   const rankings = powerRankings(season); // already sorted 1 (strongest) first
 
   return (
-    <section className="stat-card">
-      <h2>Power Rankings</h2>
-      <p className="stat-card-subtitle">Recency-weighted margin of victory — recent blowouts count more than one from week 1.</p>
+    <StatCard metric="powerRankings">
       <ul className="stat-list">
         {rankings.map((entry) => (
           <li key={entry.rosterId} className="stat-row">
             <span className="stat-row-name">
               #{entry.rank} {teamName(entry.rosterId)}
             </span>
-            <span className="stat-row-value">{entry.score > 0 ? `+${entry.score.toFixed(1)}` : entry.score.toFixed(1)}</span>
+            <span className="stat-row-value">
+              {entry.score > 0 ? "+" : ""}
+              {entry.score.toFixed(1)} pts/game
+            </span>
           </li>
         ))}
       </ul>
-    </section>
+    </StatCard>
   );
 }
 
@@ -181,9 +194,7 @@ function ScheduleSwapCard({ season, teamName }: { season: Season; teamName: (id:
     .sort((a, b) => b.bestWins - a.bestWins);
 
   return (
-    <section className="stat-card">
-      <h2>Schedule Swap</h2>
-      <p className="stat-card-subtitle">Best- and worst-case record if this team had played someone else's schedule.</p>
+    <StatCard metric="scheduleSwap">
       <ul className="stat-list">
         {rows.map(({ rosterId, bestWins, worstWins, gamesPlayed }) => (
           <li key={rosterId} className="stat-row">
@@ -194,7 +205,42 @@ function ScheduleSwapCard({ season, teamName }: { season: Season; teamName: (id:
           </li>
         ))}
       </ul>
-    </section>
+    </StatCard>
+  );
+}
+
+function AllPlayCard({
+  season,
+  luck,
+  teamName,
+}: {
+  season: Season;
+  luck: Map<RosterId, LuckIndexEntry>;
+  teamName: (id: RosterId) => string;
+}) {
+  // Sorted by the number the row actually shows — the all-play record — so the
+  // order needs no explaining.
+  const rows = [...season.teams.keys()].sort((a, b) => (luck.get(b)?.allPlayWinPct ?? 0) - (luck.get(a)?.allPlayWinPct ?? 0));
+
+  return (
+    <StatCard metric="allPlay">
+      <ul className="stat-list">
+        {rows.map((rosterId) => {
+          const entry = luck.get(rosterId);
+          if (!entry) return null;
+          const { wins, losses, ties } = entry.allPlayRecord;
+          return (
+            <li key={rosterId} className="stat-row">
+              <span className="stat-row-name">{teamName(rosterId)}</span>
+              <span className="stat-row-value">
+                {wins}-{losses}
+                {ties > 0 ? `-${ties}` : ""} all-play &middot; beat {Math.round(entry.allPlayWinPct * 100)}% of the league
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+    </StatCard>
   );
 }
 
@@ -207,34 +253,35 @@ function LuckCard({
   luck: Map<RosterId, LuckIndexEntry>;
   teamName: (id: RosterId) => string;
 }) {
-  const allPlayRecords = allPlay(season);
   const rows = [...season.teams.keys()].sort((a, b) => (luck.get(b)?.luck ?? 0) - (luck.get(a)?.luck ?? 0));
 
   return (
-    <section className="stat-card">
-      <h2>All-Play &amp; Luck</h2>
-      <p className="stat-card-subtitle">Record if every team played every team every week, and how that compares to actual wins.</p>
+    <StatCard metric="luck">
       <ul className="stat-list">
-        {rows.map((rosterId) => {
-          const record = allPlayRecords.get(rosterId);
+        {rows.map((rosterId, i) => {
           const entry = luck.get(rosterId);
-          if (!record || !entry) return null;
-          const luckLabel = entry.luck > 0 ? `+${entry.luck.toFixed(1)}` : entry.luck.toFixed(1);
+          if (!entry) return null;
+          const luckLabel = `${entry.luck > 0 ? "+" : ""}${entry.luck.toFixed(1)}`;
+          // Naming the two ends makes the sort self-evident without opening
+          // the explainer.
+          const tag = i === 0 ? "luckiest" : i === rows.length - 1 ? "unluckiest" : null;
           return (
             <li key={rosterId} className="stat-row">
-              <span className="stat-row-name">{teamName(rosterId)}</span>
+              <span className="stat-row-name">
+                {teamName(rosterId)} {tag && <span className="stat-row-tag">({tag})</span>}
+              </span>
               <span className="stat-row-value">
-                {record.wins}-{record.losses}
-                {record.ties > 0 ? `-${record.ties}` : ""} all-play
+                {entry.record.wins}-{entry.record.losses}
+                {entry.record.ties > 0 ? `-${entry.record.ties}` : ""} vs {entry.expectedWins.toFixed(1)} expected
               </span>
               <span className={`stat-row-badge ${entry.luck >= 0 ? "badge-positive" : "badge-negative"}`}>
-                {luckLabel} luck
+                {luckLabel} wins
               </span>
             </li>
           );
         })}
       </ul>
-    </section>
+    </StatCard>
   );
 }
 
@@ -247,18 +294,17 @@ function CoachingEfficiencyCard({
   playerIndex: Map<string, PlayerMeta>;
   teamName: (id: RosterId) => string;
 }) {
-  const efficiency = coachingEfficiency(season, playerIndex);
-  const totals = [...efficiency.entries()]
+  const totals = [...coachingEfficiency(season, playerIndex).entries()]
     .map(([rosterId, weeks]) => ({
       rosterId,
       pointsLeftOnBench: weeks.reduce((sum, w) => sum + Math.max(0, w.optimal - w.actual), 0),
     }))
-    .sort((a, b) => b.pointsLeftOnBench - a.pointsLeftOnBench);
+    // Fewest points left on the bench first — every card in the app leads with
+    // the team doing best on that metric.
+    .sort((a, b) => a.pointsLeftOnBench - b.pointsLeftOnBench);
 
   return (
-    <section className="stat-card">
-      <h2>Coaching Efficiency</h2>
-      <p className="stat-card-subtitle">Total points left on the bench this season by starting a suboptimal lineup.</p>
+    <StatCard metric="coachingEfficiency">
       <ul className="stat-list">
         {totals.map(({ rosterId, pointsLeftOnBench }) => (
           <li key={rosterId} className="stat-row">
@@ -267,7 +313,7 @@ function CoachingEfficiencyCard({
           </li>
         ))}
       </ul>
-    </section>
+    </StatCard>
   );
 }
 
@@ -277,8 +323,7 @@ function HighlightsCard({ season, teamName }: { season: Season; teamName: (id: R
   if (!latestWeek || !highlights) return null;
 
   return (
-    <section className="stat-card">
-      <h2>Week {latestWeek.week} Highlights</h2>
+    <StatCard metric="weeklyHighlights" title={`Week ${latestWeek.week} Highlights`} subtitle={null}>
       <ul className="stat-list">
         <li className="stat-row">
           <span className="stat-row-name">Biggest blowout</span>
@@ -303,6 +348,6 @@ function HighlightsCard({ season, teamName }: { season: Season; teamName: (id: R
           </li>
         )}
       </ul>
-    </section>
+    </StatCard>
   );
 }

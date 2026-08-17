@@ -22,7 +22,7 @@ export function Home() {
           id="username"
           name="username"
           type="text"
-          placeholder="e.g. Havok21"
+          placeholder="Your Sleeper username"
           value={username}
           onChange={(e) => setUsername(e.target.value)}
           autoComplete="off"
