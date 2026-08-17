@@ -9,10 +9,9 @@ import { faabEfficiency } from "../../stats/faabEfficiency";
 import { luckIndex } from "../../stats/luckIndex";
 import { powerRankings } from "../../stats/powerRankings";
 import { teamLog, teamSeasonTotals, type TeamWeekLogEntry } from "../../stats/teamLog";
-import { MetricInfoModal } from "../components/MetricInfoModal";
+import { KpiTile } from "../components/KpiTile";
 import { StatCard } from "../components/StatCard";
 import { ordinal, recordLabel, signed } from "../format";
-import type { MetricKey } from "../metricInfo";
 
 type LoadState =
   | { status: "loading" }
@@ -31,7 +30,6 @@ export function ManagerPage() {
   const { leagueId = "", userId = "" } = useParams();
   const [state, setState] = useState<LoadState>({ status: "loading" });
   const [selectedSeason, setSelectedSeason] = useState<string | null>(null);
-  const [activeMetric, setActiveMetric] = useState<MetricKey | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -138,27 +136,10 @@ export function ManagerPage() {
         </div>
       )}
 
-      <SeasonSection
-        season={season}
-        rosterId={rosterId}
-        playerIndex={state.playerIndex}
-        opponentName={opponentName}
-        onExplain={setActiveMetric}
-      />
+      <SeasonSection season={season} rosterId={rosterId} playerIndex={state.playerIndex} opponentName={opponentName} />
 
       <CareerSection data={state.data} userId={userId} playerIndex={state.playerIndex} managerName={managerName} />
-
-      {activeMetric && <MetricInfoModal metric={activeMetric} onClose={() => setActiveMetric(null)} />}
     </main>
-  );
-}
-
-function KpiTile({ value, label, metric, onExplain }: { value: string; label: string; metric: MetricKey; onExplain: (m: MetricKey) => void }) {
-  return (
-    <button type="button" className="kpi-tile" onClick={() => onExplain(metric)}>
-      <span className="kpi-value">{value}</span>
-      <span className="kpi-label">{label}</span>
-    </button>
   );
 }
 
@@ -167,13 +148,11 @@ function SeasonSection({
   rosterId,
   playerIndex,
   opponentName,
-  onExplain,
 }: {
   season: Season;
   rosterId: RosterId;
   playerIndex: Map<string, PlayerMeta>;
   opponentName: (id: RosterId) => string;
-  onExplain: (metric: MetricKey) => void;
 }) {
   const log = useMemo(() => teamLog(season, rosterId, playerIndex), [season, rosterId, playerIndex]);
   const totals = useMemo(() => teamSeasonTotals(log), [log]);
@@ -194,33 +173,18 @@ function SeasonSection({
       <h2 className="section-heading">{season.season} season</h2>
 
       <div className="kpi-grid">
-        {luck && <KpiTile value={recordLabel(luck.record)} label="Record" metric="record" onExplain={onExplain} />}
-        <KpiTile value={totals.pointsFor.toFixed(1)} label="Points for" metric="pointsFor" onExplain={onExplain} />
-        <KpiTile
-          value={totals.pointsAgainst.toFixed(1)}
-          label="Points against"
-          metric="pointsAgainst"
-          onExplain={onExplain}
-        />
-        {luck && (
-          <KpiTile value={recordLabel(luck.allPlayRecord)} label="All-play" metric="allPlay" onExplain={onExplain} />
-        )}
-        {luck && <KpiTile value={signed(luck.luck)} label="Luck (wins)" metric="luck" onExplain={onExplain} />}
-        {power && (
-          <KpiTile value={`#${power.rank}`} label={`Power ${signed(power.score)}`} metric="powerRankings" onExplain={onExplain} />
-        )}
-        <KpiTile
-          value={totals.pointsLeftOnBench.toFixed(1)}
-          label="Left on bench"
-          metric="coachingEfficiency"
-          onExplain={onExplain}
-        />
+        {luck && <KpiTile value={recordLabel(luck.record)} label="Record" metric="record" />}
+        <KpiTile value={totals.pointsFor.toFixed(1)} label="Points for" metric="pointsFor" />
+        <KpiTile value={totals.pointsAgainst.toFixed(1)} label="Points against" metric="pointsAgainst" />
+        {luck && <KpiTile value={recordLabel(luck.allPlayRecord)} label="All-play" metric="allPlay" />}
+        {luck && <KpiTile value={signed(luck.luck)} label="Luck (wins)" metric="luck" />}
+        {power && <KpiTile value={`#${power.rank}`} label={`Power ${signed(power.score)}`} metric="powerRankings" />}
+        <KpiTile value={totals.pointsLeftOnBench.toFixed(1)} label="Left on bench" metric="coachingEfficiency" />
         {totals.bestWeek && (
           <KpiTile
             value={totals.bestWeek.points.toFixed(1)}
             label={`Best (wk ${totals.bestWeek.week})`}
             metric="bestWorstWeek"
-            onExplain={onExplain}
           />
         )}
         {totals.worstWeek && (
@@ -228,7 +192,6 @@ function SeasonSection({
             value={totals.worstWeek.points.toFixed(1)}
             label={`Worst (wk ${totals.worstWeek.week})`}
             metric="bestWorstWeek"
-            onExplain={onExplain}
           />
         )}
       </div>
