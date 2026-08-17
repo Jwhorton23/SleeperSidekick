@@ -10,6 +10,13 @@
   --space-3: 1rem;
   --space-4: 1.5rem;
   --radius: 0.5rem;
+  /* Verdict colors, best to worst, plus a neutral for facts that are context
+     rather than judgement. */
+  --tone-good: #4ade80;
+  --tone-fair: #facc15;
+  --tone-warn: #f97316;
+  --tone-bad: #f87171;
+  --tone-info: #7aa8f5;
   color-scheme: dark;
 }
 
@@ -319,6 +326,167 @@ dialog.metric-info::backdrop {
   flex-basis: 100%;
   color: var(--color-text-muted);
   font-size: 0.8125rem;
+}
+
+/* ---- week-by-week cards ---- */
+
+.week-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.week-row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0)) var(--color-surface);
+  border: 1px solid var(--color-border);
+  /* The result reads as a colored spine down the left edge of the card. */
+  border-left: 3px solid var(--color-border);
+  border-radius: 0.75rem;
+  padding: var(--space-3);
+}
+
+.week-row-W {
+  border-left-color: var(--tone-good);
+}
+
+.week-row-L {
+  border-left-color: var(--tone-bad);
+}
+
+.week-row-T {
+  border-left-color: var(--tone-fair);
+}
+
+.week-row-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.week-row-label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.week-result {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  line-height: 1;
+  padding: 0.2rem 0.4rem;
+  border-radius: 999px;
+}
+
+.week-result-W {
+  color: var(--tone-good);
+  background: color-mix(in srgb, var(--tone-good) 16%, transparent);
+}
+
+.week-result-L {
+  color: var(--tone-bad);
+  background: color-mix(in srgb, var(--tone-bad) 16%, transparent);
+}
+
+.week-result-T {
+  color: var(--tone-fair);
+  background: color-mix(in srgb, var(--tone-fair) 16%, transparent);
+}
+
+.week-row-score {
+  font-size: 1.0625rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.week-score-sep,
+.week-score-them {
+  color: var(--color-text-muted);
+  font-weight: 600;
+}
+
+.week-score-sep {
+  margin: 0 0.2rem;
+}
+
+.week-row-opponent {
+  margin: -0.25rem 0 0;
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+}
+
+/* Stacked color-coded facts. They sit side by side when two short ones fit,
+   and wrap to their own lines otherwise. */
+.week-facts {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-2);
+}
+
+.week-fact {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex: 0 1 auto;
+  min-width: 0;
+  font-size: 0.8125rem;
+  line-height: 1.3;
+  padding: 0.2rem 0.6rem 0.2rem 0.5rem;
+  border: 1px solid color-mix(in srgb, var(--fact-tone) 24%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--fact-tone) 9%, transparent);
+  color: var(--color-text-muted);
+}
+
+.week-fact-dot {
+  flex: none;
+  width: 0.4rem;
+  height: 0.4rem;
+  border-radius: 50%;
+  background: var(--fact-tone);
+}
+
+.week-fact-value {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: color-mix(in srgb, var(--fact-tone) 78%, var(--color-text));
+}
+
+.tone-good {
+  --fact-tone: var(--tone-good);
+}
+
+.tone-fair {
+  --fact-tone: var(--tone-fair);
+}
+
+.tone-warn {
+  --fact-tone: var(--tone-warn);
+}
+
+.tone-bad {
+  --fact-tone: var(--tone-bad);
+}
+
+.tone-info {
+  --fact-tone: var(--tone-info);
 }
 
 /* ---- expandable rows (draft picks) ---- */

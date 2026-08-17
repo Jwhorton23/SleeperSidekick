@@ -8,7 +8,7 @@ import { careerDraftHitRates } from "../../stats/draftGrades";
 import { faabEfficiency } from "../../stats/faabEfficiency";
 import { luckIndex } from "../../stats/luckIndex";
 import { powerRankings } from "../../stats/powerRankings";
-import { teamLog, teamSeasonTotals } from "../../stats/teamLog";
+import { teamLog, teamSeasonTotals, type TeamWeekLogEntry } from "../../stats/teamLog";
 import { MetricInfoModal } from "../components/MetricInfoModal";
 import { StatCard } from "../components/StatCard";
 import { ordinal, recordLabel, signed } from "../format";
@@ -234,33 +234,96 @@ function SeasonSection({
       </div>
 
       <StatCard metric="weekLog">
-        <ul className="stat-list">
+        <ul className="week-list">
           {log.map((entry) => (
-            <li key={entry.week} className="stat-row">
-              <span className="stat-row-name">
-                Week {entry.week}
-                {entry.result && (
-                  <span className={`stat-row-badge ${entry.result === "L" ? "badge-negative" : "badge-positive"}`}>
-                    {" "}
-                    {entry.result}
-                  </span>
-                )}
-              </span>
-              <span className="stat-row-value">
-                {entry.opponentPoints === null || entry.opponentRosterId === null
-                  ? `${entry.points.toFixed(1)} · no opponent`
-                  : `${entry.points.toFixed(1)}–${entry.opponentPoints.toFixed(1)} vs ${opponentName(entry.opponentRosterId)}`}
-              </span>
-              <span className="stat-row-note">
-                Outscored {entry.allPlayWins} of {entry.allPlayGames} other teams
-                {entry.pointsLeftOnBench > 0 && ` · ${entry.pointsLeftOnBench.toFixed(1)} left on bench`}
-                {entry.topStarter && ` · top: ${entry.topStarter.name} ${entry.topStarter.points.toFixed(1)}`}
-              </span>
-            </li>
+            <WeekRow key={entry.week} entry={entry} opponentName={opponentName} />
           ))}
         </ul>
       </StatCard>
     </>
+  );
+}
+
+/** How a week-log fact reads at a glance: green good through red bad, plus a
+ * neutral blue for facts that are context rather than judgement. */
+type FactTone = "good" | "fair" | "warn" | "bad" | "info";
+
+/** Share of the league this score beat — the higher the better. */
+function allPlayTone(wins: number, games: number): FactTone {
+  if (games === 0) return "info";
+  const share = wins / games;
+  if (share >= 0.75) return "good";
+  if (share >= 0.5) return "fair";
+  if (share >= 0.25) return "warn";
+  return "bad";
+}
+
+/** Bench points are a tally of mistakes, so the scale runs the other way. */
+function benchTone(points: number): FactTone {
+  if (points < 5) return "good";
+  if (points < 15) return "fair";
+  if (points < 25) return "warn";
+  return "bad";
+}
+
+function WeekFact({ tone, label, value }: { tone: FactTone; label: string; value: string }) {
+  return (
+    <li className={`week-fact tone-${tone}`}>
+      <span className="week-fact-dot" aria-hidden="true" />
+      <span className="week-fact-text">
+        {label} <span className="week-fact-value">{value}</span>
+      </span>
+    </li>
+  );
+}
+
+function WeekRow({
+  entry,
+  opponentName,
+}: {
+  entry: TeamWeekLogEntry;
+  opponentName: (id: RosterId) => string;
+}) {
+  const played = entry.opponentRosterId !== null && entry.opponentPoints !== null;
+
+  return (
+    <li className={`week-row${entry.result ? ` week-row-${entry.result}` : ""}`}>
+      <div className="week-row-head">
+        <span className="week-row-label">
+          Week {entry.week}
+          {entry.result && <span className={`week-result week-result-${entry.result}`}>{entry.result}</span>}
+        </span>
+        <span className="week-row-score">
+          {entry.points.toFixed(1)}
+          {played && (
+            <>
+              <span className="week-score-sep">–</span>
+              <span className="week-score-them">{entry.opponentPoints!.toFixed(1)}</span>
+            </>
+          )}
+        </span>
+      </div>
+
+      <p className="week-row-opponent">
+        {played ? `vs ${opponentName(entry.opponentRosterId!)}` : "No opponent scheduled"}
+      </p>
+
+      <ul className="week-facts">
+        <WeekFact
+          tone={allPlayTone(entry.allPlayWins, entry.allPlayGames)}
+          label="Outscored"
+          value={`${entry.allPlayWins} of ${entry.allPlayGames}`}
+        />
+        {entry.pointsLeftOnBench > 0 ? (
+          <WeekFact tone={benchTone(entry.pointsLeftOnBench)} label="Left on bench" value={`${entry.pointsLeftOnBench.toFixed(1)} pts`} />
+        ) : (
+          <WeekFact tone="good" label="Lineup" value="perfect" />
+        )}
+        {entry.topStarter && (
+          <WeekFact tone="info" label={`Top: ${entry.topStarter.name}`} value={entry.topStarter.points.toFixed(1)} />
+        )}
+      </ul>
+    </li>
   );
 }
 
